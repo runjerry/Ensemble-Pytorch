@@ -3,7 +3,7 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 
 from torchensemble.utils import io
-from torchensemble.utils.logging import set_logger
+from torchensemble.utils.logger import set_logger
 from torchensemble import NeuralForestClassifier, NeuralForestRegressor
 
 

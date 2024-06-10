@@ -17,17 +17,33 @@ def set_optimizer(model, optimizer_name, **kwargs):
         "ASGD",
         "RMSprop",
         "Rprop",
-        "SGD",
     ]
-    if optimizer_name not in torch_optim_optimizers:
+    customize_optimizers = [
+        "SGD",
+        "affineSGD",
+    ]
+    # if optimizer_name not in torch_optim_optimizers:
+    #     msg = "Unrecognized optimizer: {}, should be one of {}."
+    #     raise NotImplementedError(
+    #         msg.format(optimizer_name, ",".join(torch_optim_optimizers))
+    #     )
+
+    if optimizer_name in torch_optim_optimizers:
+        optimizer_cls = getattr(
+            importlib.import_module("torch.optim"), optimizer_name
+        )
+    elif optimizer_name in customize_optimizers:
+        optimizer_cls = getattr(
+            importlib.import_module(".optimizers", package=__package__), 
+            optimizer_name
+        )
+    else:
         msg = "Unrecognized optimizer: {}, should be one of {}."
         raise NotImplementedError(
-            msg.format(optimizer_name, ",".join(torch_optim_optimizers))
+            msg.format(optimizer_name, ",".join(
+                torch_optim_optimizers + customize_optimizers))
         )
 
-    optimizer_cls = getattr(
-        importlib.import_module("torch.optim"), optimizer_name
-    )
     optimizer = optimizer_cls(model.parameters(), **kwargs)
 
     return optimizer

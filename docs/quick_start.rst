@@ -49,7 +49,7 @@ Ensemble-PyTorch uses a global logger to track and print the intermediate loggin
 
 .. code-block:: python
 
-    from torchensemble.utils.logging import set_logger
+    from torchensemble.utils.logger import set_logger
 
     logger = set_logger('classification_mnist_mlp')
 
@@ -152,7 +152,7 @@ The script below shows an example on using VotingClassifier with 10 MLPs for cla
     from torchvision import datasets, transforms
 
     from torchensemble import VotingClassifier
-    from torchensemble.utils.logging import set_logger
+    from torchensemble.utils.logger import set_logger
 
     # Define Your Base Estimator
     class MLP(nn.Module):

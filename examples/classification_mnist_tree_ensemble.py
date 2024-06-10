@@ -3,7 +3,7 @@ import torch
 from torchvision import datasets, transforms
 
 from torchensemble import NeuralForestClassifier
-from torchensemble.utils.logging import set_logger
+from torchensemble.utils.logger import set_logger
 
 
 if __name__ == "__main__":

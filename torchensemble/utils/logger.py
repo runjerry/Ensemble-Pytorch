@@ -8,6 +8,7 @@ __all__ = ["set_logger", "get_tb_logger"]
 
 
 def set_logger(
+    log_dir,
     log_file=None,
     log_console_level="info",
     log_file_level=None,
@@ -40,7 +41,7 @@ def set_logger(
         _logger.removeHandler(h)
 
     rq = time.strftime("%Y_%m_%d_%H_%M", time.localtime(time.time()))
-    log_path = os.path.join(os.getcwd(), "logs")
+    log_path = os.path.join(os.getcwd(), "logs", log_dir)
 
     ch_formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s: %(message)s"
@@ -53,8 +54,8 @@ def set_logger(
     if log_file is not None:
         print("Log will be saved in '{}'.".format(log_path))
         if not os.path.exists(log_path):
-            os.mkdir(log_path)
-            print("Create folder 'logs/'")
+            os.makedirs(log_path)
+            print(f"Create folder {log_path}")
         log_name = os.path.join(log_path, log_file + "-" + rq + ".log")
         print("Start logging into file {}...".format(log_name))
         fh = logging.FileHandler(log_name, mode="w")
@@ -72,10 +73,9 @@ def set_logger(
     _logger.setLevel("DEBUG")
 
     if use_tb_logger:
-        tb_log_path = os.path.join(
-            log_path, log_file + "-" + rq + "_tb_logger"
-        )
-        os.mkdir(tb_log_path)
+        tb_log_path = os.path.join(log_path, log_file)
+        if not os.path.exists(tb_log_path):
+            os.makedirs(tb_log_path)
         init_tb_logger(log_dir=tb_log_path)
 
     return _logger

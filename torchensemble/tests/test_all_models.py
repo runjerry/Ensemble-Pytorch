@@ -7,7 +7,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 import torchensemble
 from torchensemble.utils import io
-from torchensemble.utils.logging import set_logger
+from torchensemble.utils.logger import set_logger
 
 
 # All classifiers

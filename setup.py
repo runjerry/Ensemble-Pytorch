@@ -63,14 +63,14 @@ setup(
         " and robustness of your deep learning model"
     ),
     license="BSD 3-Clause",
-    url="https://github.com/TorchEnsemble-Community/Ensemble-Pytorch",
-    project_urls={
-        "Bug Tracker": "https://github.com/TorchEnsemble-Community/Ensemble-Pytorch/issues",
-        "Documentation": "https://ensemble-pytorch.readthedocs.io",
-        "Source Code": "https://github.com/TorchEnsemble-Community/Ensemble-Pytorch",
-    },
+    # url="https://github.com/TorchEnsemble-Community/Ensemble-Pytorch",
+    # project_urls={
+    #     "Bug Tracker": "https://github.com/TorchEnsemble-Community/Ensemble-Pytorch/issues",
+    #     "Documentation": "https://ensemble-pytorch.readthedocs.io",
+    #     "Source Code": "https://github.com/TorchEnsemble-Community/Ensemble-Pytorch",
+    # },
     version="0.2.0",
-    long_description=long_description,
+    # long_description=long_description,
     classifiers=[
         "Intended Audience :: Science/Research",
         "Intended Audience :: Developers",

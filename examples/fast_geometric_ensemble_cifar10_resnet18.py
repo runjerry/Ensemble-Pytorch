@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from torchensemble import FastGeometricClassifier
-from torchensemble.utils.logging import set_logger
+from torchensemble.utils.logger import set_logger
 
 
 # The class `BasicBlock` and `ResNet` is modified from:

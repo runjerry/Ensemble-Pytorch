@@ -15,6 +15,7 @@ from joblib import Parallel, delayed
 from ._base import BaseClassifier, BaseRegressor, BaseTreeEnsemble
 from ._base import torchensemble_model_doc
 from .utils import io
+from .utils.metrics import auc_score
 from .utils import set_module
 from .utils import operator as op
 
@@ -155,6 +156,7 @@ class VotingClassifier(BaseClassifier):
         epochs=100,
         log_interval=100,
         test_loader=None,
+        ood_loader=None,
         save_model=True,
         save_dir=None,
     ):
@@ -199,7 +201,30 @@ class VotingClassifier(BaseClassifier):
             elif self.voting_strategy == "hard":
                 proba = op.majority_vote(outputs)
 
+            # pred = torch.stack(outputs, dim=0)
+            # return pred, proba
             return proba
+
+        # Internal helper function on pseudo evaluate
+        def _evaluate(estimators, eval_loader):
+            self.eval()
+            with torch.no_grad():
+                correct = 0
+                total = 0
+                outputs = []
+                for _, elem in enumerate(eval_loader):
+                    data, target = io.split_data_target(
+                        elem, self.device
+                    )
+                    output, proba = _forward(estimators, *data)
+                    _, predicted = torch.max(proba.data, 1)
+                    correct += (predicted == target).sum().item()
+                    total += target.size(0)
+                    outputs.append(output)
+                acc = 100 * correct / total
+                outputs = torch.cat(outputs, dim=1)
+
+            return outputs, acc
 
         # Maintain a pool of workers
         with Parallel(n_jobs=self.n_jobs) as parallel:
@@ -244,8 +269,23 @@ class VotingClassifier(BaseClassifier):
                     optimizers.append(optimizer)
                     losses.append(loss)
 
+                # print("=====================================================")
+                # print("Start evaluation")
+
                 # Validation
                 if test_loader:
+                    # # [n_estimators, n_data, n_pred]
+                    # outputs, acc = _evaluate(estimators, test_loader)  
+                    # msg = (
+                    #     "Epoch: {:03d} | Validation Acc: {:.3f}"
+                    #     # " % | Historical Best: {:.3f} %"
+                    # )
+                    # self.logger.info(msg.format(epoch, acc))
+                    # if self.tb_logger:
+                    #     self.tb_logger.add_scalar(
+                    #         "voting/Validation_Acc", acc, epoch
+                    #     )
+
                     self.eval()
                     with torch.no_grad():
                         correct = 0
@@ -276,12 +316,30 @@ class VotingClassifier(BaseClassifier):
                             self.tb_logger.add_scalar(
                                 "voting/Validation_Acc", acc, epoch
                             )
-                # No validation
-                else:
-                    self.estimators_ = nn.ModuleList()
-                    self.estimators_.extend(estimators)
-                    if save_model:
-                        io.save(self, save_dir, self.logger)
+
+                # if ood_loader:
+                #     # [n_estimators, n_data, n_pred]
+                #     outputs_ood = _evaluate(estimators, ood_loader)[0]
+                #
+                # if test_loader and ood_loader:
+                #     variance = outputs.var(dim=0).sum(1).cpu().numpy()  # [n_data]
+                #     variance_ood = outputs_ood.var(dim=0).sum(1).cpu().numpy()  # [n_data]
+                #     auc = auc_score(variance, variance_ood) 
+                #                         msg = (
+                #         "Epoch: {:03d} | Ood AUC: {:.3f}"
+                #     )
+                #     self.logger.info(msg.format(epoch, auc))
+                #     if self.tb_logger:
+                #         self.tb_logger.add_scalar(
+                #             "voting/ood_auc", auc, epoch
+                #         )
+
+                # # No validation
+                # else:
+                #     self.estimators_ = nn.ModuleList()
+                #     self.estimators_.extend(estimators)
+                #     if save_model:
+                #         io.save(self, save_dir, self.logger)
 
                 # Update the scheduler
                 with warnings.catch_warnings():

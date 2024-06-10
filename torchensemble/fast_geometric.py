@@ -21,7 +21,7 @@ from ._base import torchensemble_model_doc
 from .utils import io
 from .utils import set_module
 from .utils import operator as op
-from .utils.logging import get_tb_logger
+from .utils.logger import get_tb_logger
 
 
 __all__ = ["FastGeometricClassifier", "FastGeometricRegressor"]

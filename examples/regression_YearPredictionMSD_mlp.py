@@ -15,7 +15,7 @@ from torchensemble.bagging import BaggingRegressor
 from torchensemble.gradient_boosting import GradientBoostingRegressor
 from torchensemble.snapshot_ensemble import SnapshotEnsembleRegressor
 
-from torchensemble.utils.logging import set_logger
+from torchensemble.utils.logger import set_logger
 
 
 def load_data(batch_size):

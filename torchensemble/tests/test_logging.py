@@ -1,6 +1,6 @@
 import pytest
 
-from torchensemble.utils.logging import set_logger
+from torchensemble.utils.logger import set_logger
 
 
 def _record(logger):

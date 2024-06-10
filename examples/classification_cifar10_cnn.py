@@ -14,7 +14,7 @@ from torchensemble.gradient_boosting import GradientBoostingClassifier
 from torchensemble.snapshot_ensemble import SnapshotEnsembleClassifier
 from torchensemble.soft_gradient_boosting import SoftGradientBoostingClassifier
 
-from torchensemble.utils.logging import set_logger
+from torchensemble.utils.logger import set_logger
 
 
 def display_records(records, logger):
