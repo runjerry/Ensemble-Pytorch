@@ -54,11 +54,11 @@ def load_cifar10(data_dir, batch_size=128, split=False):
 
     if split:
         train_idx = [0, 1, 2, 3, 4, 5]
-        test_idx = [6, 7, 8, 9]
+        ood_idx = [6, 7, 8, 9]
 
     else:
         train_idx = list(range(10))
-        test_idx = list(range(10))
+        ood_idx = list(range(10))
 
     trainset = datasets.CIFAR10(
         data_dir, train=True, download=True, transform=train_transformer)
@@ -70,20 +70,20 @@ def load_cifar10(data_dir, batch_size=128, split=False):
         shuffle=True,
     )
 
-    valset = datasets.CIFAR10(data_dir, train=False, transform=test_transformer)
-    val_subset = Subset(valset, get_classes(valset, train_idx))
-    val_loader = DataLoader(
-        val_subset,
-        batch_size=batch_size,
-        shuffle=True
-    )
-
     testset = datasets.CIFAR10(data_dir, train=False, transform=test_transformer)
-    test_subset = Subset(valset, get_classes(valset, test_idx))
+    test_subset = Subset(testset, get_classes(testset, train_idx))
     test_loader = DataLoader(
         test_subset,
         batch_size=batch_size,
         shuffle=True
     )
 
-    return train_loader, val_loader, test_loader
+    # oodset = datasets.CIFAR10(data_dir, train=False, transform=test_transformer)
+    ood_subset = Subset(testset, get_classes(testset, ood_idx))
+    ood_loader = DataLoader(
+        ood_subset,
+        batch_size=batch_size,
+        shuffle=True
+    )
+
+    return train_loader, test_loader, ood_loader

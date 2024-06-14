@@ -19,13 +19,18 @@ from torchensemble.utils.dataloader import load_cifar10
 
 def display_records(records, logger):
     msg = (
-        "{:<28} | Testing Acc: {:.2f} % | Training Time: {:.2f} s |"
-        " Evaluating Time: {:.2f} s"
+        "{:<28} | Training Time: {:.2f} s"
     )
+    # msg = (
+    #     "{:<28} | Testing Acc: {:.2f} % | Training Time: {:.2f} s |"
+    #     " Evaluating Time: {:.2f} s"
+    # )
 
     print("\n")
-    for method, training_time, evaluating_time, acc in records:
-        logger.info(msg.format(method, acc, training_time, evaluating_time))
+    for method, training_time in records:
+        logger.info(msg.format(method, training_time))
+    # for method, training_time, evaluating_time, acc in records:
+    #     logger.info(msg.format(method, acc, training_time, evaluating_time))
 
 
 def set_random_seed(seed):
@@ -81,6 +86,7 @@ parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
 parser.add_argument('--wd', default=5e-4, type=float, help='weight decay')
 parser.add_argument('--bs', default=128, type=int)
 parser.add_argument('--n', default=10, type=int, help='ensemble size')
+parser.add_argument('--nj', default=10, type=int, help='num of jobs')
 parser.add_argument('--model', default='lenet', type=str)
 parser.add_argument('--bias', action='store_false')
 parser.add_argument('--fullrank', action='store_true')
@@ -94,7 +100,7 @@ parser.add_argument('--exp', default=None, type=float)
 parser.add_argument('--optimizer', default='sgd', type=str)
 parser.add_argument('--dataset', default='cifar10', type=str)
 parser.add_argument('--log_dir', default='runs', type=str)
-parser.add_argument('--epoch', default=100, type=int)
+parser.add_argument('--epoch', default=200, type=int)
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--extra', default=None, type=str)
 
@@ -140,9 +146,12 @@ if __name__ == "__main__":
     else:
         str_extra = '_' + args.extra
     log_dir = os.path.join(args.dataset, args.optimizer)
-    log_file = ('%s_epoch%d_n%d_seed%d_scale%.1f%s%s%s%s%s%s' % (
-                args.model, args.epoch, args.n, args.seed, args.scale,
-                str_fullrank, str_rv, str_wo, str_diag, str_exp, str_extra))
+    # log_file = ('%s_epoch%d_n%d_nj%d_seed%d_scale%.1f%s%s%s%s%s%s' % (
+    #             args.model, args.epoch, args.n, args.nj, args.seed, args.scale,
+    #             str_fullrank, str_rv, str_wo, str_diag, str_exp, str_extra))
+    log_file = f"{args.model}_epoch{args.epoch}_n{args.n}_nj{args.nj}_seed{args.seed}" \
+               f"_lr{args.lr}_scale{args.scale}{str_fullrank}{str_rv}{str_wo}" \
+               f"{str_diag}{str_exp}{str_extra}"
 
     # Hyper-parameters
     # n_estimators = 10
@@ -171,19 +180,19 @@ if __name__ == "__main__":
     # VotingClassifier
     model = VotingClassifier(
         estimator=LeNet5, n_estimators=args.n, estimator_args=estimator_args, 
-        cuda=True, n_jobs=10
+        cuda=True, n_jobs=args.nj
     )
 
     # Set the optimizer
     if args.optimizer == 'sgd':
         optimizer_name = 'SGD'
         extra_kwargs = dict(lr=args.lr, weight_decay=args.wd)
-    elif args.optimizer == 'affineSGD':
+    elif args.optimizer == 'gtk':
         optimizer_name = 'affineSGD'
         extra_kwargs = dict(lr=args.lr, weight_decay=args.wd,
-                            fullrank=args.fullrank, fixed_rand_vec=args.fixed_rand_vec,
-                            weight_only=args.weight_only, diag=args.diag,
-                            scale=args.scale, exponential=args.exponential)
+                            fullrank=args.fullrank, fixed_rand_vec=args.fixedRV,
+                            weight_only=args.weightonly, diag=args.diag,
+                            scale=args.scale, exponential=args.exp)
     else:
         raise ValueError(f"Unsupported optimizer: {args.optimizer}")
     model.set_optimizer(optimizer_name, **extra_kwargs)
@@ -198,14 +207,18 @@ if __name__ == "__main__":
     toc = time.time()
     training_time = toc - tic
 
-    # Evaluating
-    tic = time.time()
-    testing_acc = model.evaluate(test_loader)
-    toc = time.time()
-    evaluating_time = toc - tic
+    # # Evaluating
+    # tic = time.time()
+    # testing_acc = model.evaluate(test_loader)
+    # toc = time.time()
+    # evaluating_time = toc - tic
+    #
+    # records.append(
+    #     ("VotingClassifier", training_time, evaluating_time, testing_acc)
+    # )
 
     records.append(
-        ("VotingClassifier", training_time, evaluating_time, testing_acc)
+        ("VotingClassifier", training_time)
     )
 
     # Print results on different ensemble methods

@@ -15,7 +15,7 @@ from joblib import Parallel, delayed
 from ._base import BaseClassifier, BaseRegressor, BaseTreeEnsemble
 from ._base import torchensemble_model_doc
 from .utils import io
-from .utils.metrics import auc_score
+from .utils.metrics import auc_score, compute_ece, entropy_prob
 from .utils import set_module
 from .utils import operator as op
 
@@ -195,44 +195,61 @@ class VotingClassifier(BaseClassifier):
                 F.softmax(estimator(*x), dim=1) for estimator in estimators
             ]
 
-            if self.voting_strategy == "soft":
-                proba = op.average(outputs)
-
-            elif self.voting_strategy == "hard":
-                proba = op.majority_vote(outputs)
-
-            # pred = torch.stack(outputs, dim=0)
+            # if self.voting_strategy == "soft":
+            #     proba = op.average(outputs)
+            #
+            # elif self.voting_strategy == "hard":
+            #     proba = op.majority_vote(outputs)
             # return pred, proba
-            return proba
+
+            outputs = torch.stack(outputs, dim=0)
+            proba = outputs.mean(0)
+            pred_entropy = entropy_prob(proba)
+            confidence, preds = proba.max(dim=-1)
+            return outputs, pred_entropy, confidence, preds
 
         # Internal helper function on pseudo evaluate
         def _evaluate(estimators, eval_loader):
             self.eval()
+            outputs = []
+            labels = []
+            entropies = []
+            confidences = []
+            preds = []
             with torch.no_grad():
                 correct = 0
                 total = 0
                 outputs = []
                 for _, elem in enumerate(eval_loader):
-                    data, target = io.split_data_target(
+                    data, label = io.split_data_target(
                         elem, self.device
                     )
-                    output, proba = _forward(estimators, *data)
-                    _, predicted = torch.max(proba.data, 1)
-                    correct += (predicted == target).sum().item()
-                    total += target.size(0)
+                    output, entropy, confidence, pred = _forward(estimators, *data)
+                    # _, predicted = torch.max(proba.data, 1)
+                    correct += (pred == label).sum().item()
+                    total += label.size(0)
                     outputs.append(output)
+                    labels.append(label)
+                    entropies.append(entropy)
+                    confidences.append(confidence)
+                    preds.append(pred)
                 acc = 100 * correct / total
                 outputs = torch.cat(outputs, dim=1)
+                labels = torch.cat(labels, dim=0)
+                confidences = torch.cat(confidences, dim=0)
+                entropies = torch.cat(entropies, dim=0)
+                preds = torch.cat(preds, dim=0)
 
-            return outputs, acc
+            return outputs, labels, entropies, confidences, preds, acc
 
         # Maintain a pool of workers
-        with Parallel(n_jobs=self.n_jobs) as parallel:
+        with Parallel(n_jobs=self.n_jobs, prefer="threads") as parallel:
 
             # Training loop
             for epoch in range(epochs):
                 self.train()
 
+                print("========================= Training =========================")
                 if self.use_scheduler_:
                     if self.scheduler_name == "ReduceLROnPlateau":
                         cur_lr = optimizers[0].param_groups[0]["lr"]
@@ -269,70 +286,102 @@ class VotingClassifier(BaseClassifier):
                     optimizers.append(optimizer)
                     losses.append(loss)
 
-                # print("=====================================================")
-                # print("Start evaluation")
-
                 # Validation
                 if test_loader:
-                    # # [n_estimators, n_data, n_pred]
-                    # outputs, acc = _evaluate(estimators, test_loader)  
-                    # msg = (
-                    #     "Epoch: {:03d} | Validation Acc: {:.3f}"
-                    #     # " % | Historical Best: {:.3f} %"
-                    # )
-                    # self.logger.info(msg.format(epoch, acc))
-                    # if self.tb_logger:
-                    #     self.tb_logger.add_scalar(
-                    #         "voting/Validation_Acc", acc, epoch
-                    #     )
+                    print("========================= Testing =========================")
 
-                    self.eval()
-                    with torch.no_grad():
-                        correct = 0
-                        total = 0
-                        for _, elem in enumerate(test_loader):
-                            data, target = io.split_data_target(
-                                elem, self.device
-                            )
-                            output = _forward(estimators, *data)
-                            _, predicted = torch.max(output.data, 1)
-                            correct += (predicted == target).sum().item()
-                            total += target.size(0)
-                        acc = 100 * correct / total
-
-                        if acc > best_acc:
-                            best_acc = acc
-                            self.estimators_ = nn.ModuleList()
-                            self.estimators_.extend(estimators)
-                            if save_model:
-                                io.save(self, save_dir, self.logger)
-
-                        msg = (
-                            "Epoch: {:03d} | Validation Acc: {:.3f}"
-                            " % | Historical Best: {:.3f} %"
+                    # [n_estimators, n_data, n_pred]
+                    outputs, labels, entropy, confidence, pred, acc = _evaluate(
+                        estimators, test_loader)  
+                    msg = (
+                        "Epoch: {:03d} | Test Acc: {:.3f}"
+                        # " % | Historical Best: {:.3f} %"
+                    )
+                    self.logger.info(msg.format(epoch, acc))
+                    if self.tb_logger:
+                        self.tb_logger.add_scalar(
+                            "voting/test_acc", acc, epoch
                         )
-                        self.logger.info(msg.format(epoch, acc, best_acc))
-                        if self.tb_logger:
-                            self.tb_logger.add_scalar(
-                                "voting/Validation_Acc", acc, epoch
-                            )
 
-                # if ood_loader:
-                #     # [n_estimators, n_data, n_pred]
-                #     outputs_ood = _evaluate(estimators, ood_loader)[0]
-                #
-                # if test_loader and ood_loader:
-                #     variance = outputs.var(dim=0).sum(1).cpu().numpy()  # [n_data]
-                #     variance_ood = outputs_ood.var(dim=0).sum(1).cpu().numpy()  # [n_data]
-                #     auc = auc_score(variance, variance_ood) 
-                #                         msg = (
-                #         "Epoch: {:03d} | Ood AUC: {:.3f}"
-                #     )
-                #     self.logger.info(msg.format(epoch, auc))
-                #     if self.tb_logger:
-                #         self.tb_logger.add_scalar(
-                #             "voting/ood_auc", auc, epoch
-                #         )
+                    # compute ece
+                    ece = compute_ece(confidence, pred, labels, num_bins=15)
+                    msg = (
+                        "Epoch: {:03d} | Test ECE: {:.3f}"
+                    )
+                    self.logger.info(msg.format(epoch, ece))
+                    if self.tb_logger:
+                        self.tb_logger.add_scalar(
+                            "voting/test_ece", ece, epoch
+                        )
+
+                    # self.eval()
+                    # with torch.no_grad():
+                    #     correct = 0
+                    #     total = 0
+                    #     for _, elem in enumerate(test_loader):
+                    #         data, target = io.split_data_target(
+                    #             elem, self.device
+                    #         )
+                    #         output = _forward(estimators, *data)
+                    #         _, predicted = torch.max(output.data, 1)
+                    #         correct += (predicted == target).sum().item()
+                    #         total += target.size(0)
+                    #     acc = 100 * correct / total
+                    #
+                    #     if acc > best_acc:
+                    #         best_acc = acc
+                    #         self.estimators_ = nn.ModuleList()
+                    #         self.estimators_.extend(estimators)
+                    #         if save_model:
+                    #             io.save(self, save_dir, self.logger)
+                    #
+                    #     msg = (
+                    #         "Epoch: {:03d} | Validation Acc: {:.3f}"
+                    #         " % | Historical Best: {:.3f} %"
+                    #     )
+                    #     self.logger.info(msg.format(epoch, acc, best_acc))
+                    #     if self.tb_logger:
+                    #         self.tb_logger.add_scalar(
+                    #             "voting/Validation_Acc", acc, epoch
+                    #         )
+
+                if ood_loader:
+                    # [n_estimators, n_data, n_pred]
+                    outputs_ood, _, entropy_ood, confidence_ood, pred_ood, _ = _evaluate(
+                        estimators, ood_loader)
+
+                if test_loader and ood_loader:
+                    # compute auroc w.r.t. var, confidence, and entropy
+                    variance = outputs.var(dim=0).sum(1).cpu().numpy()  # [n_data]
+                    variance_ood = outputs_ood.var(dim=0).sum(1).cpu().numpy()  # [n_data]
+                    auroc_var = auc_score(variance, variance_ood) 
+                    auroc_conf = auc_score(confidence.cpu().numpy(), 
+                                           confidence_ood.cpu().numpy())
+                    auroc_ent = auc_score(entropy.cpu().numpy(), 
+                                          entropy_ood.cpu().numpy())
+                    msg = (
+                        "Epoch: {:03d} | Variance Auroc: {:.3f}"
+                    )
+                    self.logger.info(msg.format(epoch, auroc_var))
+                    msg = (
+                        "Epoch: {:03d} | Confidence Auroc: {:.3f}"
+                    )
+                    self.logger.info(msg.format(epoch, auroc_conf))
+                    msg = (
+                        "Epoch: {:03d} | Entropy Auroc: {:.3f}"
+                    )
+                    self.logger.info(msg.format(epoch, auroc_ent))
+                    if self.tb_logger:
+                        self.tb_logger.add_scalar(
+                            "voting/auroc_var", auroc_var, epoch
+                        )
+                        self.tb_logger.add_scalar(
+                            "voting/auroc_conf", auroc_conf, epoch
+                        )
+                        self.tb_logger.add_scalar(
+                            "voting/auroc_ent", auroc_ent, epoch
+                        )
+
 
                 # # No validation
                 # else:
