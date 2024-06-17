@@ -58,7 +58,6 @@ def load_cifar10(data_dir, batch_size=128, split=False):
 
     else:
         train_idx = list(range(10))
-        ood_idx = list(range(10))
 
     trainset = datasets.CIFAR10(
         data_dir, train=True, download=True, transform=train_transformer)
@@ -79,11 +78,14 @@ def load_cifar10(data_dir, batch_size=128, split=False):
     )
 
     # oodset = datasets.CIFAR10(data_dir, train=False, transform=test_transformer)
-    ood_subset = Subset(testset, get_classes(testset, ood_idx))
-    ood_loader = DataLoader(
-        ood_subset,
-        batch_size=batch_size,
-        shuffle=True
-    )
+    if split:
+        ood_subset = Subset(testset, get_classes(testset, ood_idx))
+        ood_loader = DataLoader(
+            ood_subset,
+            batch_size=batch_size,
+            shuffle=True
+        )
+    else:
+        ood_loader = None
 
     return train_loader, test_loader, ood_loader
