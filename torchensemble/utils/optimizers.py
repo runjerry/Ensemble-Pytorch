@@ -97,7 +97,7 @@ class affineSGD(SGD):
                  use_bias=True, fullrank=True, scale=1.0,
                  fixed_rand_vec=True, weight_only=False,
                  same_norm=False, norm=False, diag=False,
-                 exponential=None):
+                 exponential=None, rank=2):
 
         assert not (fullrank and diag), (
             "fullrank and diag are incompatible with each other")
@@ -125,7 +125,9 @@ class affineSGD(SGD):
                 if self._use_bias and idx % 2 == 1 and self._weight_only:
                     rand_vecs.append(None)
                 else:
-                    rand_vec = self._scale * torch.randn_like(param.data)
+                    # rand_vec = self._scale * torch.randn_like(param.data)
+                    rand_vec = self._scale * torch.randn(
+                        [*param.data.shape, rank], device=param.data.device)
                     if self._diag:
                         if self._exponential:
                             rand_vec = torch.exp(self._exponential * rand_vec)
@@ -174,7 +176,9 @@ class affineSGD(SGD):
                 if self._diag:
                     grad = rand_vec * param.grad.data
                 else:
-                    grad = torch.mul(rand_vec, param.grad.data).sum() * rand_vec
+                    # grad = torch.mul(rand_vec, param.grad.data).sum() * rand_vec
+                    prod = torch.einsum('...,...i->i', param.grad.data, rand_vec)
+                    grad = torch.einsum('...i,i->...', rand_vec, prod)
                 if self._fullrank:
                     grad += param.grad.data
                 if self._same_norm:
