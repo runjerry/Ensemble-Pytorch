@@ -97,7 +97,7 @@ class affineSGD(SGD):
                  use_bias=True, fullrank=True, scale=1.0,
                  fixed_rand_vec=True, weight_only=False,
                  same_norm=False, norm=False, diag=False,
-                 exponential=None, rank=2):
+                 exponential=None, rank=2, diag_scale=1.0):
 
         assert not (fullrank and diag), (
             "fullrank and diag are incompatible with each other")
@@ -113,6 +113,7 @@ class affineSGD(SGD):
         self._same_norm = same_norm
         self._norm = norm
         self._diag = diag
+        self._diag_scale = diag_scale
         self._exponential = exponential
 
         group = self.param_groups[0]
@@ -126,8 +127,9 @@ class affineSGD(SGD):
                     rand_vecs.append(None)
                 else:
                     # rand_vec = self._scale * torch.randn_like(param.data)
+                    last_dim = min(param.data.nelement(), rank)
                     rand_vec = self._scale * torch.randn(
-                        [*param.data.shape, rank], device=param.data.device)
+                        [*param.data.shape, last_dim], device=param.data.device)
                     if self._diag:
                         if self._exponential:
                             rand_vec = torch.exp(self._exponential * rand_vec)
@@ -135,7 +137,16 @@ class affineSGD(SGD):
                             rand_vec += 1
                             rand_vec = torch.clamp(rand_vec, 0.)
                     elif not self._same_norm and not self._norm:
-                        rand_vec = rand_vec / rand_vec.norm()
+                        if rand_vec.ndim >= 4:
+                            vec_norm = rand_vec.norm('nuc', dim=(2, 3), keepdim=True)
+                        else:
+                            vec_norm = rand_vec.norm()
+                        # elif rand_vec.ndim <= 2:
+                        #     vec_norm = rand_vec.norm(dim=0, keepdim=True)
+                        # else:
+                        #     raise ValueError("rand_vec has wrong shape")
+                        rand_vec = rand_vec / vec_norm
+                        # rand_vec = rand_vec / rand_vec.norm()
                     rand_vecs.append(rand_vec)
             self._rand_vecs = rand_vecs
 
@@ -180,7 +191,7 @@ class affineSGD(SGD):
                     prod = torch.einsum('...,...i->i', param.grad.data, rand_vec)
                     grad = torch.einsum('...i,i->...', rand_vec, prod)
                 if self._fullrank:
-                    grad += param.grad.data
+                    grad += self._diag_scale * param.grad.data
                 if self._same_norm:
                     grad = (grad / grad.norm()) * param.grad.data.norm()
                 if self._norm:

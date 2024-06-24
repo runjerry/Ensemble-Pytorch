@@ -97,6 +97,7 @@ parser.add_argument('--weightonly', action='store_true')
 # parser.add_argument('--samenorm', action='store_true')
 # parser.add_argument('--norm', action='store_true')
 parser.add_argument('--diag', action='store_true')
+parser.add_argument('--dscale', default=1.0, type=float, help='diagonal scaling')
 parser.add_argument('--exp', default=None, type=float)
 parser.add_argument('--optimizer', default='sgd', type=str)
 parser.add_argument('--dataset', default='cifar10', type=str)
@@ -142,6 +143,10 @@ if __name__ == "__main__":
         str_diag = '_diag'
     else:
         str_diag = ''
+    if args.dscale < 1:
+        str_dscale = f'_dscale{args.dscale}'
+    else:
+        str_dscale = ''
     if args.exp:
         str_exp = f'_exp{args.exp}'
     else:
@@ -155,8 +160,8 @@ if __name__ == "__main__":
     #             args.model, args.epoch, args.n, args.nj, args.seed, args.scale,
     #             str_fullrank, str_rv, str_wo, str_diag, str_exp, str_extra))
     log_file = f"{args.model}_epoch{args.epoch}_n{args.n}_nj{args.nj}_seed{args.seed}" \
-               f"_lr{args.lr}_scale{args.scale}{str_fullrank}{str_rank}{str_rv}" \
-               f"{str_wo}{str_diag}{str_exp}{str_extra}"
+               f"_lr{args.lr}_scale{args.scale}{str_fullrank}{str_rank}{str_dscale}" \
+               f"{str_rv}{str_wo}{str_diag}{str_exp}{str_extra}"
 
     # Hyper-parameters
     # n_estimators = 10
@@ -196,8 +201,9 @@ if __name__ == "__main__":
         optimizer_name = 'affineSGD'
         extra_kwargs = dict(lr=args.lr, weight_decay=args.wd,
                             fullrank=args.fullrank, fixed_rand_vec=args.fixedRV,
-                            weight_only=args.weightonly, diag=args.diag,
-                            scale=args.scale, exponential=args.exp, rank=args.rank)
+                            weight_only=args.weightonly, diag=args.diag, 
+                            scale=args.scale, exponential=args.exp, 
+                            rank=args.rank, diag_scale=args.dscale)
     else:
         raise ValueError(f"Unsupported optimizer: {args.optimizer}")
     model.set_optimizer(optimizer_name, **extra_kwargs)
