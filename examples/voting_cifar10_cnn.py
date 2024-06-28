@@ -89,13 +89,14 @@ parser.add_argument('--n', default=10, type=int, help='ensemble size')
 parser.add_argument('--nj', default=10, type=int, help='num of jobs')
 parser.add_argument('--model', default='lenet', type=str)
 parser.add_argument('--bias', action='store_false')
+parser.add_argument('--exact', action='store_true')
 parser.add_argument('--fullrank', action='store_true')
 parser.add_argument('--rank', default=1, type=int, help='rank of rand_vec')
 parser.add_argument('--fixedRV', action='store_true')
 parser.add_argument('--scale', default=1.0, type=float)
 parser.add_argument('--weightonly', action='store_true')
 # parser.add_argument('--samenorm', action='store_true')
-# parser.add_argument('--norm', action='store_true')
+parser.add_argument('--matnorm', action='store_true')
 parser.add_argument('--diag', action='store_true')
 parser.add_argument('--dscale', default=1.0, type=float, help='diagonal scaling')
 parser.add_argument('--exp', default=None, type=float)
@@ -135,14 +136,21 @@ if __name__ == "__main__":
     #     str_sn = '_samenorm'
     # else:
     #     str_sn = ''
-    # if args.norm:
-    #     str_norm = '_norm'
-    # else:
-    #     str_norm = ''
+    if args.matnorm:
+        str_matnorm = '_matnorm'
+    else:
+        str_matnorm = ''
     if args.diag:
         str_diag = '_diag'
     else:
         str_diag = ''
+    if args.exact:
+        str_exact = '_exact'
+        str_fullrank = ''
+        str_diag = ''
+        str_rank = ''
+    else:
+        str_exact = ''
     if args.dscale < 1:
         str_dscale = f'_dscale{args.dscale}'
     else:
@@ -160,8 +168,8 @@ if __name__ == "__main__":
     #             args.model, args.epoch, args.n, args.nj, args.seed, args.scale,
     #             str_fullrank, str_rv, str_wo, str_diag, str_exp, str_extra))
     log_file = f"{args.model}_epoch{args.epoch}_n{args.n}_nj{args.nj}_seed{args.seed}" \
-               f"_lr{args.lr}_scale{args.scale}{str_fullrank}{str_rank}{str_dscale}" \
-               f"{str_rv}{str_wo}{str_diag}{str_exp}{str_extra}"
+               f"_lr{args.lr}_scale{args.scale}{str_exact}{str_fullrank}{str_rank}{str_dscale}" \
+               f"{str_rv}{str_matnorm}{str_wo}{str_diag}{str_exp}{str_extra}"
 
     # Hyper-parameters
     # n_estimators = 10
@@ -203,6 +211,7 @@ if __name__ == "__main__":
                             fullrank=args.fullrank, fixed_rand_vec=args.fixedRV,
                             weight_only=args.weightonly, diag=args.diag, 
                             scale=args.scale, exponential=args.exp, 
+                            mat_norm=args.matnorm, exact=args.exact,
                             rank=args.rank, diag_scale=args.dscale)
     else:
         raise ValueError(f"Unsupported optimizer: {args.optimizer}")
