@@ -162,7 +162,7 @@ class VotingClassifier(BaseClassifier):
     ):
 
         self._validate_parameters(epochs, log_interval)
-        self.n_outputs = self._decide_n_outputs(train_loader)
+        # self.n_outputs = self._decide_n_outputs(train_loader)
 
         # Instantiate a pool of base estimators, optimizers, and schedulers.
         estimators = []

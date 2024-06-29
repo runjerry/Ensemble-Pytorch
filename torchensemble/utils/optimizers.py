@@ -131,10 +131,14 @@ class affineSGD(SGD):
                 else:
                     if self._exact:
                         size_param = param.data.nelement()
-                        rand_mat = torch.rand(size_param, size_param)
-                        mat = torch.inverse(rand_mat @ rand_mat.t())
-                        cond_mat = mat / mat.norm()
-                        rand_vecs.append(cond_mat)
+                        rand_mat = torch.rand(size_param, size_param, 
+                                              device=param.data.device) 
+                        mat_prod = rand_mat @ rand_mat.T + torch.eye(
+                            size_param, device=rand_mat.device) * 1e-3
+                        L = torch.linalg.cholesky(mat_prod)
+                        mat_inv = torch.cholesky_inverse(L)
+                        mat = mat_inv / mat_inv.norm()
+                        rand_vecs.append(mat)
                     else:
                         last_dim = min(param.data.nelement(), rank)
                         # rand_vec = self._scale * torch.randn(
@@ -190,7 +194,8 @@ class affineSGD(SGD):
                 if self._fixed_rand_vec:
                     rand_vec = self._rand_vecs[idx]
                 else:
-                    rand_vec = self._scale * torch.randn_like(param.grad.data)
+                    rand_vec = self._scale * torch.randn_like(
+                        param.grad.data, device=param.data.device)
                     if self._diag:
                         if self._exponential:
                             rand_vec = torch.exp(self._exponential * rand_vec)
